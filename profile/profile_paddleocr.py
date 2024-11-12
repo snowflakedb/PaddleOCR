@@ -1,13 +1,12 @@
 from paddleocr import PaddleOCR
 
-from PIL.Image import Image
 import os
 import numpy as np
-from pdf2image import convert_from_bytes
 import timeit
 import cProfile
 import click
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from profile.commons import load_pdf_bytes, pdf_to_image
 
 
 class PaddleSettings(BaseSettings):
@@ -27,18 +26,6 @@ class PaddleSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PADDLE_")
 
 
-def _load_pdf_bytes() -> bytes:
-    dir_path = os.path.dirname(__file__)
-    path = os.path.join(dir_path, "resources", "sample_pdf.pdf")
-    with open(path, "rb") as fh:
-        return fh.read()
-
-
-def pdf_to_image(pdf_bytes: bytes, dpi: int) -> Image:
-    images = convert_from_bytes(pdf_bytes, dpi=dpi, grayscale=False)
-    return images[0]
-
-
 class TimeitDpi:
     def __init__(self, settings: PaddleSettings) -> None:
         self.settings = settings
@@ -47,7 +34,7 @@ class TimeitDpi:
         self.std_exec_time = [0] * len(self.dpi_values)
 
     def setup(self) -> None:
-        self.pdf_bytes = _load_pdf_bytes()
+        self.pdf_bytes = load_pdf_bytes()
         self.model = PaddleOCR(**self.settings.model_dump())
 
     def timeit(self) -> None:
@@ -75,7 +62,7 @@ class CprofilePaddle:
         self.dpi_values = [50, 100, 150, 200, 250, 300]
 
     def setup(self) -> None:
-        self.pdf_bytes = _load_pdf_bytes()
+        self.pdf_bytes = load_pdf_bytes()
         self.model = PaddleOCR(**self.settings.model_dump())
 
     def profile(self) -> None:
@@ -95,7 +82,7 @@ class CprofilePaddle:
 
 
 def print_recognition_pred():
-    pdf_bytes = _load_pdf_bytes()
+    pdf_bytes = load_pdf_bytes()
     model = PaddleOCR(det=False, rec=True, cls=False)
     image = pdf_to_image(pdf_bytes, dpi=300)
     ocr_result = model.ocr(np.asarray(image), det=False, rec=True, cls=False)
@@ -107,7 +94,7 @@ def print_recognition_pred():
     "--mode",
     default="timeit",
     help="Mode to run the script in.",
-    choices=["timeit", "cprofile", "print_recognition_pred"],
+    type=click.Choice(["timeit", "cprofile", "print_recognition_pred"]),
 )
 def main(mode: str) -> None:
     if mode == "timeit":
