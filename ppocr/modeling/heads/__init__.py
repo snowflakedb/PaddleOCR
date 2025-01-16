@@ -44,6 +44,8 @@ def build_head(config):
     from .rec_satrn_head import SATRNHead
     from .rec_parseq_head import ParseQHead
     from .rec_cppd_head import CPPDHead
+    from .rec_unimernet_head import UniMERNetHead
+    from .rec_ppformulanet_head import PPFormulaNet_Head
 
     # cls head
     from .cls_head import ClsHead
@@ -87,6 +89,8 @@ def build_head(config):
         "PFHeadLocal",
         "ParseQHead",
         "CPPDHead",
+        "UniMERNetHead",
+        "PPFormulaNet_Head",
     ]
 
     if config["name"] == "DRRGHead":

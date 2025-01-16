@@ -115,7 +115,7 @@ def merge_config(config, opts):
     return config
 
 
-def check_device(use_gpu, use_xpu=False, use_npu=False, use_mlu=False):
+def check_device(use_gpu, use_xpu=False, use_npu=False, use_mlu=False, use_gcu=False):
     """
     Log error and exit when set use_gpu=true in paddlepaddle
     cpu version.
@@ -153,6 +153,9 @@ def check_device(use_gpu, use_xpu=False, use_npu=False, use_mlu=False):
                     sys.exit(1)
         if use_mlu and not paddle.device.is_compiled_with_mlu():
             print(err.format("use_mlu", "mlu", "mlu", "use_mlu"))
+            sys.exit(1)
+        if use_gcu and not paddle.device.is_compiled_with_custom_device("gcu"):
+            print(err.format("use_gcu", "gcu", "gcu", "use_gcu"))
             sys.exit(1)
     except Exception as e:
         pass
@@ -330,7 +333,12 @@ def train(
                         preds = model(batch)
                     elif algorithm in ["CAN"]:
                         preds = model(batch[:3])
-                    elif algorithm in ["LaTeXOCR"]:
+                    elif algorithm in [
+                        "LaTeXOCR",
+                        "UniMERNet",
+                        "PP-FormulaNet-S",
+                        "PP-FormulaNet-L",
+                    ]:
                         preds = model(batch)
                     else:
                         preds = model(images)
@@ -347,7 +355,12 @@ def train(
                     preds = model(batch)
                 elif algorithm in ["CAN"]:
                     preds = model(batch[:3])
-                elif algorithm in ["LaTeXOCR"]:
+                elif algorithm in [
+                    "LaTeXOCR",
+                    "UniMERNet",
+                    "PP-FormulaNet-S",
+                    "PP-FormulaNet-L",
+                ]:
                     preds = model(batch)
                 else:
                     preds = model(images)
@@ -373,6 +386,14 @@ def train(
                 elif algorithm in ["LaTeXOCR"]:
                     model_type = "latexocr"
                     post_result = post_process_class(preds, batch[1], mode="train")
+                    eval_class(post_result[0], post_result[1], epoch_reset=(idx == 0))
+                elif algorithm in ["UniMERNet"]:
+                    model_type = "unimernet"
+                    post_result = post_process_class(preds[0], batch[1], mode="train")
+                    eval_class(post_result[0], post_result[1], epoch_reset=(idx == 0))
+                elif algorithm in ["PP-FormulaNet-S", "PP-FormulaNet-L"]:
+                    model_type = "pp_formulanet"
+                    post_result = post_process_class(preds[0], batch[1], mode="train")
                     eval_class(post_result[0], post_result[1], epoch_reset=(idx == 0))
                 else:
                     if config["Loss"]["name"] in [
@@ -670,7 +691,7 @@ def eval(
                     preds = model(batch)
                 elif model_type in ["can"]:
                     preds = model(batch[:3])
-                elif model_type in ["latexocr"]:
+                elif model_type in ["latexocr", "unimernet", "pp_formulanet"]:
                     preds = model(batch)
                 elif model_type in ["sr"]:
                     preds = model(batch)
@@ -698,7 +719,7 @@ def eval(
                 eval_class(preds, batch_numpy)
             elif model_type in ["can"]:
                 eval_class(preds[0], batch_numpy[2:], epoch_reset=(idx == 0))
-            elif model_type in ["latexocr"]:
+            elif model_type in ["latexocr", "unimernet", "pp_formulanet"]:
                 post_result = post_process_class(preds, batch[1], "eval")
                 eval_class(post_result[0], post_result[1], epoch_reset=(idx == 0))
             else:
@@ -799,6 +820,7 @@ def preprocess(is_train=False):
     use_xpu = config["Global"].get("use_xpu", False)
     use_npu = config["Global"].get("use_npu", False)
     use_mlu = config["Global"].get("use_mlu", False)
+    use_gcu = config["Global"].get("use_gcu", False)
 
     alg = config["Architecture"]["algorithm"]
     assert alg in [
@@ -845,6 +867,10 @@ def preprocess(is_train=False):
         "ParseQ",
         "CPPD",
         "LaTeXOCR",
+        "UniMERNet",
+        "SLANeXt",
+        "PP-FormulaNet-S",
+        "PP-FormulaNet-L",
     ]
 
     if use_xpu:
@@ -853,9 +879,11 @@ def preprocess(is_train=False):
         device = "npu:{0}".format(os.getenv("FLAGS_selected_npus", 0))
     elif use_mlu:
         device = "mlu:{0}".format(os.getenv("FLAGS_selected_mlus", 0))
+    elif use_gcu:  # Use Enflame GCU(General Compute Unit)
+        device = "gcu:{0}".format(os.getenv("FLAGS_selected_gcus", 0))
     else:
         device = "gpu:{}".format(dist.ParallelEnv().dev_id) if use_gpu else "cpu"
-    check_device(use_gpu, use_xpu, use_npu, use_mlu)
+    check_device(use_gpu, use_xpu, use_npu, use_mlu, use_gcu)
 
     device = paddle.set_device(device)
 

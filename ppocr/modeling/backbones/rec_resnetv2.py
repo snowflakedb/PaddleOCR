@@ -88,6 +88,12 @@ class StdConv2dSame(nn.Conv2D):
         self.export = is_export
         self.eps = eps
 
+        self.running_mean = paddle.zeros([self._out_channels], dtype="float32")
+        self.running_variance = paddle.ones([self._out_channels], dtype="float32")
+        self.batch_norm = paddle.nn.BatchNorm1D(
+            self._out_channels, use_global_stats=False
+        )
+
     def forward(self, x):
         if not self.training:
             self.export = True
@@ -96,17 +102,12 @@ class StdConv2dSame(nn.Conv2D):
                 x = pad_same_export(x, self._kernel_size, self._stride, self._dilation)
             else:
                 x = pad_same(x, self._kernel_size, self._stride, self._dilation)
-        running_mean = paddle.to_tensor([0] * self._out_channels, dtype="float32")
-        running_variance = paddle.to_tensor([1] * self._out_channels, dtype="float32")
         if self.export:
             weight = paddle.reshape(
-                F.batch_norm(
-                    self.weight.reshape([1, self._out_channels, -1]),
-                    running_mean,
-                    running_variance,
-                    momentum=0.0,
-                    epsilon=self.eps,
-                    use_global_stats=False,
+                self.batch_norm(
+                    self.weight.reshape([1, self._out_channels, -1]).cast(
+                        paddle.float32
+                    ),
                 ),
                 self.weight.shape,
             )
@@ -114,8 +115,8 @@ class StdConv2dSame(nn.Conv2D):
             weight = paddle.reshape(
                 F.batch_norm(
                     self.weight.reshape([1, self._out_channels, -1]),
-                    running_mean,
-                    running_variance,
+                    self.running_mean,
+                    self.running_variance,
                     training=True,
                     momentum=0.0,
                     epsilon=self.eps,

@@ -41,7 +41,16 @@ def apply_to_static(model, config, logger):
     assert (
         "d2s_train_image_shape" in config["Global"]
     ), "d2s_train_image_shape must be assigned for static training mode..."
-    supported_list = ["DB", "SVTR_LCNet", "TableMaster", "LayoutXLM", "SLANet", "SVTR"]
+    supported_list = [
+        "DB",
+        "SVTR_LCNet",
+        "TableMaster",
+        "LayoutXLM",
+        "SLANet",
+        "SVTR",
+        "SVTR_HGNet",
+        "LaTeXOCR",
+    ]
     if config["Architecture"]["algorithm"] in ["Distillation"]:
         algo = list(config["Architecture"]["Models"].values())[0]["algorithm"]
     else:
@@ -110,6 +119,14 @@ def apply_to_static(model, config, logger):
                 InputSpec([None], dtype="int64"),
             ]
         )
+    elif algo == "LaTeXOCR":
+        specs = [
+            [
+                InputSpec(shape=[None, 1, None, None], dtype="float32"),
+                InputSpec(shape=[None, None], dtype="float32"),
+                InputSpec(shape=[None, None], dtype="float32"),
+            ]
+        ]
     model = to_static(model, input_spec=specs)
     logger.info("Successfully to apply @to_static with specs: {}".format(specs))
     return model
